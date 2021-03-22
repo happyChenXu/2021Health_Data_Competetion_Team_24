@@ -12,7 +12,7 @@ library("dplyr") # For data processing
 library("stringr")
 # install.packages("xlsx")
 library("xlsx") 
-library("data.table")
+#library("data.table")
 
 # install_github("Displayr/flipAPI")
 library("flipAPI")
@@ -146,7 +146,7 @@ People_one_Dose_by_Gender<- read.csv("People_one_Dose_by_Gender03212021.csv", he
 # download data
 download.file("https://mn.gov/covid19/assets/Vaccinations%20by%20Race%20and%20Ethnicity_tcm1148-470631.csv",dest="Vaccinations_by_Race_and_Ethnicity03212021.csv")
 Vaccinations_by_Race_and_Ethnicity<- read.csv("Vaccinations_by_Race_and_Ethnicity03212021.csv", header=T)
-View(Vaccinations_by_Race_and_Ethnicity)
+
 
 ### Vaccination Progress to Date, by Race and Ethnicity
 # download data
@@ -287,7 +287,7 @@ Organized_MN_population$age_0_65 <- rowSums(t(Matrix[1:13,]))
 
 Organized_MN_population$age_65_ <- rowSums(t(Matrix[14:18,]))
 
-#--------merge final_data_27 and reservation status----------
+#--------merge final_data_29 and reservation status----------
 
 
 reservation <-c(0,0,1,1,0,0,0,0,1,0,1,0,0,0,1,1,0,0,0,0,0,0,0,0,1,0,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1)
@@ -327,7 +327,8 @@ final_data_29$People.with.at.least.one.vaccine.dose.percentage <- 100*final_data
 final_data_29$percentage_age_65_ <- 100*final_data_29$age_65_/final_data_29$TOT_POP
 #View(final_data_29)
 
-test <- final_data_29%>%select("County","People.with.at.least.one.vaccine.dose","TOT_POP","reservation") 
+
+
 #View(test)
 # percentage of whites
 final_data_29$percentage_age_65_ <- 100*final_data_29$age_65_/final_data_29$TOT_POP
@@ -338,11 +339,70 @@ final_data_29$percentage_age_65_ <- 100*final_data_29$age_65_/final_data_29$TOT_
 
 ### Select the variables
 
-final_data_29_select <- final_data_29%>%select("County","People.with.at.least.one.vaccine.dose.percentage","percentage_age_65_","reservation") 
+final_data_29_select <- final_data_29%>%select("County","People.with.at.least.one.vaccine.dose.percentage","percentage_age_65_","reservation","total_cases","total_deaths") 
 
-final_data_29_select $reservation <- as.factor(final_data_29_select $reservation)
+final_data_29_select$reservation <- as.factor(final_data_29_select$reservation)
+
+
+## set plotly axis
+axis_x_1 <- list(showgrid = TRUE,   # 是否显示网格线
+                 zeroline = TRUE,   # 是否绘制x=0,y=0的直线
+                 nticks = 10 ,      # 坐标轴刻度的最大数目
+                 showline = TRUE ,  # 是否绘制绘图区边框
+                 title = 'Percentage of Age 65+',
+                 mirror = 'all')
+
+axis_y_1 <- list( showgrid = TRUE,   # 是否显示网格线
+                  zeroline = TRUE,   # 是否绘制x=0,y=0的直线
+                  nticks = 20 ,      # 坐标轴刻度的最大数目
+                  showline = FALSE , # 是否绘制绘图区边框
+                  title = 'Vaccinations Percentage % (at least one dose)',
+                  mirror = 'all')
+
+## total deaths
+# model it
+
+mod_29 <- lm( People.with.at.least.one.vaccine.dose.percentage~percentage_age_65_,data=final_data_29_select)
+summary(mod_29)
+
+# plot it
+final_data_29_select %>% 
+  plot_ly(x = ~percentage_age_65_ ,text = ~County)%>% 
+  add_markers(y = ~People.with.at.least.one.vaccine.dose.percentage,color="size represent relative total_deaths",size=~total_deaths) %>% 
+  add_lines(x = ~percentage_age_65_, y = fitted(mod_29),color="fitted line")%>% layout(xaxis = axis_x_1)%>% layout(yaxis = axis_y_1)%>%
+  layout(title = 'Percentage of Age 65+ vs Vaccinations Percentage with total deaths')
+
+### summary of total deaths
+mod_29_deaths <- lm( People.with.at.least.one.vaccine.dose.percentage~percentage_age_65_+total_deaths,data=final_data_29_select)
+summary(mod_29_deaths)
+
+
+
+
+## total cases
+
+# plot it
+final_data_29_select %>% 
+  plot_ly(x = ~percentage_age_65_ ,text = ~County)%>% 
+  add_markers(y = ~People.with.at.least.one.vaccine.dose.percentage,color="size represent relative total_cases",size=~total_cases) %>% 
+  add_lines(x = ~percentage_age_65_, y = fitted(mod_29),color="fitted line")%>% layout(xaxis = axis_x_1)%>% layout(yaxis = axis_y_1)%>%
+  layout(title = 'Percentage of Age 65+ vs Vaccinations Percentage with total cases')
+
+### summary of total deaths
+mod_29_cases <- lm( People.with.at.least.one.vaccine.dose.percentage~percentage_age_65_+total_cases,data=final_data_29_select)
+summary(mod_29_cases)
+
+## create new plot of death rate
+final_data_29_select$death_percent <-100*final_data_29$total_deaths/final_data_29$total_cases
+
+final_data_29_select %>%
+  plot_ly(x = ~percentage_age_65_ ,text = ~County)%>% 
+  add_markers(y = ~People.with.at.least.one.vaccine.dose.percentage,color="size represent relative total_deaths",size=~death_percent) %>% 
+  add_lines(x = ~percentage_age_65_, y = fitted(mod_29),color="fitted line")%>% layout(xaxis = axis_x_1)%>% layout(yaxis = axis_y_1)%>%
+  layout(title = 'Percentage of Age 65+ vs Vaccinations Percentage with death percent')
+
 #------------Data Analysis Indigenous-------------------
-Vaccinations_by_Race_and_Ethnicity
+#Vaccinations_by_Race_and_Ethnicity
 #------------Data  Analysis base on 29 counties---------
 
 mod1 <- lm(People.with.at.least.one.vaccine.dose.percentage~percentage_age_65_+reservation,data=final_data_29_select)
@@ -389,7 +449,6 @@ final_data_87_select <- final_data_87%>%select("County","People.with.at.least.on
 #final_data_29_select $reservation <- as.factor(final_data_29_select $reservation)
 
 #------------Data  Analysis base on all counties---------
-
 mod2 <- lm(People.with.at.least.one.vaccine.dose.percentage~percentage_age_65_,data=final_data_87_select)
 summary(mod2)
 
@@ -406,10 +465,10 @@ final_data_87_select$reservation <- factor(final_data_87_select$reservation)
  
 final_data_87_select$reservation2 <- final_data_87_select$reservation
 final_data_87_select$reservation2 <-as.character(final_data_87_select$reservation2 )
-final_data_87_select$reservation2[which(final_data_87_select$reservation==1)] <- 'Yes'
-final_data_87_select$reservation2[which(final_data_87_select$reservation==0)] <- "No"
+final_data_87_select$reservation2[which(final_data_87_select$reservation==1)] <- 'Reservation Yes'
+final_data_87_select$reservation2[which(final_data_87_select$reservation==0)] <- "Reservation No"
 ## set plotly axis
-axis_x_1 <- list( showgrid = TRUE,   # 是否显示网格线
+axis_x_1 <- list(showgrid = TRUE,   # 是否显示网格线
                 zeroline = TRUE,   # 是否绘制x=0,y=0的直线
                 nticks = 10 ,      # 坐标轴刻度的最大数目
                 showline = TRUE ,  # 是否绘制绘图区边框
@@ -430,6 +489,76 @@ final_data_87_select %>%
   add_markers(y = ~People.with.at.least.one.vaccine.dose.percentage,color =~reservation2) %>% 
   add_lines(x = ~percentage_age_65_, y = fitted(mod2),color="fitted line")%>% layout(xaxis = axis_x_1)%>% layout(yaxis = axis_y_1)%>%
   layout(title = 'Percentage of Age 65+ vs Vaccinations Percentage (at least one dose) of Minnesota Counties')
+
+#### consider total population
+
+final_data_87_select$Total.population <- final_data_87$TOT_POP
+final_data_87_select %>% 
+  plot_ly(x = ~percentage_age_65_ ,text = ~County)%>% 
+  add_markers(y = ~People.with.at.least.one.vaccine.dose.percentage,color="size represent relative population",size=~Total.population) %>% 
+  add_lines(x = ~percentage_age_65_, y = fitted(mod2),color="fitted line")%>% layout(xaxis = axis_x_1)%>% layout(yaxis = axis_y_1)%>%
+  layout(title = 'Percentage of Age 65+ vs Vaccinations Percentage with total population')
+#### consider white American percentage
+final_data_87_select$white_percentage <- 100*(final_data_87$WA_MALE+final_data_87$WA_FEMALE)/final_data_87$TOT_POP
+final_data_87_select %>% 
+  plot_ly(x = ~percentage_age_65_ ,text = ~County)%>% 
+  add_markers(y = ~People.with.at.least.one.vaccine.dose.percentage,color="size represent relative white percentage",size =~white_percentage-40) %>% 
+  add_lines(x = ~percentage_age_65_, y = fitted(mod2),color="fitted line")%>% layout(xaxis = axis_x_1)%>% layout(yaxis = axis_y_1)%>%
+  layout(title = 'Percentage of Age 65+ vs Vaccinations Percentage with white precentage')
+
+#### 
+
+#View(final_data_87)
+
+#---------regression model for all counties------
+
+
+### white percentage
+
+## consider white percentage and older percentage
+mod_87_3 <- lm( percentage_age_65_~white_percentage,data=final_data_87_select)
+summary(mod_87_3)
+final_data_87_select %>% 
+  plot_ly(x = ~white_percentage ,text = ~County)%>% 
+  add_markers(y = ~percentage_age_65_,color="points") %>% 
+  add_lines(x = ~white_percentage, y = fitted(mod_87_3),color="fitted line")
+
+
+## delete outliers
+
+final_data_87_select_deletemahnomen <-final_data_87_select[-c(which(final_data_87_select$County==c("hennepin")),which(final_data_87_select$County==c("mahnomen")),which(final_data_87_select$County==c("ramsey")),which(final_data_87_select$County==c("beltrami"))),]
+
+## remodel and replo
+mod_87_4 <- lm( percentage_age_65_~white_percentage,data=final_data_87_select_deletemahnomen)
+summary(mod_87_4)
+final_data_87_select_deletemahnomen%>% 
+  plot_ly(x = ~white_percentage ,text = ~County)%>% 
+  add_markers(y = ~percentage_age_65_,color="points") %>% 
+  add_lines(x = ~white_percentage, y = fitted(mod_87_4),color="fitted line")
+
+## redraw plots
+
+### remodel
+mod3 <- lm(People.with.at.least.one.vaccine.dose.percentage~percentage_age_65_,data=final_data_87_select_deletemahnomen)
+
+final_data_87_select_deletemahnomen %>% 
+  plot_ly(x = ~percentage_age_65_ ,text = ~County)%>% 
+  add_markers(y = ~People.with.at.least.one.vaccine.dose.percentage,color="size represent relative white percentage",size =~white_percentage-60) %>% 
+  add_lines(x = ~percentage_age_65_, y = fitted(mod3),color="fitted line")%>% layout(xaxis = axis_x_1)%>% layout(yaxis = axis_y_1)%>%
+  layout(title = 'Percentage of Age 65+ vs Vaccinations Percentage with white precentage')
+
+
+## regression
+mod_87 <- lm(People.with.at.least.one.vaccine.dose.percentage~ percentage_age_65_+white_percentage,data=final_data_87_select)
+summary(mod_87)
+plot(mod_87)
+
+## delete outlier
+
+mod_87_2<- lm(People.with.at.least.one.vaccine.dose.percentage~ percentage_age_65_+white_percentage,data=final_data_87_select[-c(16,6,55),])
+summary(mod_87_2)
+
+summary(mod_87_2)
 
 
 #----------plot of indigenous and other races---------
